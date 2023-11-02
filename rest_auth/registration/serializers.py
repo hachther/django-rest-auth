@@ -4,18 +4,32 @@ from django.contrib.auth import get_user_model
 
 try:
     from allauth.account import app_settings as allauth_settings
-    from allauth.utils import (email_address_exists,
-                               get_username_max_length)
+    from allauth.utils import (get_username_max_length)
     from allauth.account.adapter import get_adapter
     from allauth.account.utils import setup_user_email
+    from allauth.account.models import EmailAddress
     from allauth.socialaccount.helpers import complete_social_login
     from allauth.socialaccount.models import SocialAccount
     from allauth.socialaccount.providers.base import AuthProcess
-except ImportError:
+except ImportError as e:
     raise ImportError("allauth needs to be added to INSTALLED_APPS.")
 
 from rest_framework import serializers
 from requests.exceptions import HTTPError
+
+def email_address_exists(email, exclude_user=None):
+    emailaddresses = EmailAddress.objects
+    if exclude_user:
+        emailaddresses = emailaddresses.exclude(user=exclude_user)
+    ret = emailaddresses.filter(email__iexact=email).exists()
+    if not ret:
+        email_field = allauth_settings.USER_MODEL_EMAIL_FIELD
+        if email_field:
+            users = get_user_model().objects
+            if exclude_user:
+                users = users.exclude(pk=exclude_user.pk)
+            ret = users.filter(**{email_field + "__iexact": email}).exists()
+    return ret
 
 
 class SocialAccountSerializer(serializers.ModelSerializer):
